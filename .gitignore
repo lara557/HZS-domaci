@@ -1,0 +1,23 @@
+# --- BACKEND (Node.js) ---
+# Ignorišemo sve instalirane biblioteke (one su preteške za GitHub)
+Back-end/node_modules/
+Back-end/.env
+Back-end/npm-debug.log*
+
+# --- FRONTEND (Flutter) ---
+# Ignorišemo privremene fajlove koje Flutter pravi dok "bilduje" aplikaciju
+Font-end/.dart_tool/
+Font-end/build/
+Font-end/.metadata
+Font-end/.flutter-plugins
+Font-end/.flutter-plugins-dependencies
+Font-end/android/app/debug/
+Font-end/android/app/profile/
+Font-end/android/app/release/
+
+# --- SISTEM I EDITOR ---
+# Ignorišemo podešavanja samog VS Code-a i sistemske fajlove
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
