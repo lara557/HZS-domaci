@@ -1,20 +1,52 @@
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:hzs_aplikacija/components/login_textfiled.dart';
-import 'package:http/http.dart' as http; // Dodato
-import 'dart:convert'; // Dodato
 
-class SignUpPage extends StatelessWidget {
-  SignUpPage({super.key});
+class SignUpPage extends StatefulWidget {
+  const SignUpPage({super.key});
 
-  // Text editing controllers
-  final TextEditingController usernameController =
-      TextEditingController(); //Dodato
+@override
+  State<SignUpPage> createState() => _SignUpPageState();
+}
+
+class _SignUpPageState extends State<SignUpPage> {
+  // Kontroleri unutar State-a
+  final TextEditingController usernameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  final TextEditingController confirmPasswordController =
-      TextEditingController();
+  final TextEditingController confirmPasswordController = TextEditingController();
+  
+  bool isLoading = false;
 
-  Future<void> registerUser(BuildContext context) async {
+  @override
+  void dispose() {
+    // Čišćenje resursa
+    usernameController.dispose();
+    emailController.dispose();
+    passwordController.dispose();
+    confirmPasswordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> registerUser() async {
+    // 1. Osnovna provera na klijentu
+    if (passwordController.text != confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Passwords do not match!")),
+      );
+      return;
+    }
+
+    if (usernameController.text.isEmpty || emailController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all fields")),
+      );
+      return;
+    }
+
+    setState(() => isLoading = true);
+
     final url = Uri.parse('http://10.0.2.2:3000/register');
 
     try {
@@ -25,21 +57,34 @@ class SignUpPage extends StatelessWidget {
           "username": usernameController.text,
           "email": emailController.text,
           "password": passwordController.text,
-          "confirmPassword": confirmPasswordController.text,
         }),
       );
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 201) {
-        print("Uspeh: ${data['message']}");
-      } else {
-        print("Greške: ${data['messages']}");
+      if (mounted) {
+        final data = jsonDecode(response.body);
+        
+        if (response.statusCode == 201) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Registration successful! Please sign in.")),
+          );
+          Navigator.pop(context); // Vrati ga na Login ekran
+        } else {
+          // Prikaz greške sa servera (npr. "Email već postoji")
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(data['message'] ?? "Registration failed")),
+          );
+        }
       }
     } catch (e) {
-      print("Greška u povezivanju: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Connection error: $e")),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
     }
-  } //Dodato sve ovo
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -99,8 +144,10 @@ class SignUpPage extends StatelessWidget {
                     horizontal: 40.0,
                     vertical: 10.0,
                   ),
-                  child: ElevatedButton(
-                    onPressed: () => registerUser(context), //Dodato
+                  child: isLoading 
+                    ? const CircularProgressIndicator(color: Colors.black)
+                  : ElevatedButton(
+                    onPressed: registerUser,
                     // Handle sign up logic here
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Color.fromARGB(255, 0, 0, 0),
