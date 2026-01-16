@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 
-class LoginTextfiled extends StatelessWidget {
+class LoginTextField extends StatelessWidget {
   final TextEditingController? controller;
   final String hintText;
   final bool obscureText;
-  const LoginTextfiled({
+  const LoginTextField({
     super.key,
     this.controller,
     this.hintText = '',

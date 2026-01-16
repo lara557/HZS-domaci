@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import 'package:hzs_aplikacija/components/login_textfiled.dart';
+import 'package:hzs_aplikacija/components/login_textfield.dart';
 import 'package:hzs_aplikacija/components/login_button.dart';
 import 'package:hzs_aplikacija/pages/sign_up_page.dart';
-
-// Import the LoginTextfiled widget - replace with your actual import path
-// import 'path/to/login_textfield.dart';
+import 'package:hzs_aplikacija/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -29,47 +25,39 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> loginUser() async {
+    // Validacija praznih polja
+    if (usernameController.text.isEmpty || passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please fill in all fields")),
+      );
+      return;
+    }
+
     setState(() => isLoading = true);
 
-    final url = Uri.parse('http://10.0.2.2:3000/login');
+    final result = await AuthService.loginUser(
+      username: usernameController.text,
+      password: passwordController.text,
+    );
 
-    try {
-      final response = await http
-          .post(
-            url,
-            headers: {"Content-Type": "application/json"},
-            body: jsonEncode({
-              "username": usernameController.text,
-              "password": passwordController.text,
-            }),
-          )
-          .timeout(const Duration(seconds: 5));
-
-      if (mounted) {
-        // Provera da li je korisnik još na ovoj stranici
-        if (response.statusCode == 200) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text("Succsessful login!")));
-        } else {
-          final data = jsonDecode(response.body);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                data['message'] ?? "Error: Incorrect data",
-              ),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+    if (mounted) {
+      if (result['success']) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text("Connection error: $e")));
+        ).showSnackBar(SnackBar(content: Text(result['message'])));
+
+        // Očisti kontrolere
+        usernameController.clear();
+        passwordController.clear();
+
+        // Naviguj na home stranicu (zameni sa svojom home stranicom)
+        // Navigator.pushReplacementNamed(context, '/home');
+      } else {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(result['message'])));
       }
-    } finally {
-      if (mounted) setState(() => isLoading = false);
+      setState(() => isLoading = false);
     }
   }
 
@@ -97,7 +85,8 @@ class _LoginPageState extends State<LoginPage> {
                 ),
                 //username textfield
                 const SizedBox(height: 20),
-                LoginTextfiled(
+                LoginTextField(
+                  // ✅ ISPRAVLJEN NAZIV KLASE
                   controller: usernameController,
                   hintText: 'Username',
                   obscureText: false,
@@ -105,7 +94,8 @@ class _LoginPageState extends State<LoginPage> {
 
                 //password textfield
                 const SizedBox(height: 10),
-                LoginTextfiled(
+                LoginTextField(
+                  // ✅ ISPRAVLJEN NAZIV KLASE
                   controller: passwordController,
                   hintText: 'Password',
                   obscureText: true,

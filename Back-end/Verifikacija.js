@@ -1,6 +1,12 @@
 const express = require('express');
 const mysql = require('mysql2');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const cors = require('cors');
+require('dotenv').config();
 const app = express();
+
+const JWT_SECRET = process.env.JWT_SECRET || 'tvoj_tajni_kljuc_promeni_ovo';
 
 const db = mysql.createConnection({
     host: 'localhost',
@@ -61,7 +67,11 @@ const registerUser = (req, res) => {
         }
 
         const insertSql = "INSERT INTO korisnici (ime, email, lozinka) VALUES (?, ?, ?)";
-        db.query(insertSql, [username, email, password], (err, result) => {
+        
+        // Heširaj lozinku pre nego što je sačuvaš
+        const hashedPassword = bcrypt.hashSync(password, 10);
+        
+        db.query(insertSql, [username, email, hashedPassword], (err, result) => {
             if (err) {
                 console.error(err);
                 return res.status(500).json({ success: false, message: "Error saving user." });
@@ -75,20 +85,46 @@ const registerUser = (req, res) => {
 const loginUser = (req, res) => {
     const { username, password } = req.body;
 
-    const sql = "SELECT * FROM korisnici WHERE ime = ? AND lozinka = ?";
+    const sql = "SELECT * FROM korisnici WHERE ime = ?";
 
-    db.query(sql, [username, password], (err, results) => {
+    db.query(sql, [username], (err, results) => {
         if (err) {
             console.error(err);
             return res.status(500).json({ success: false, message: "Database error." });
         }
 
         if (results.length > 0) {
-            res.status(200).json({ 
-                success: true, 
-                message: "Login successful!", 
-                user: results[0] 
-            });
+            // Proveri hešovanu lozinku
+            const isPasswordValid = bcrypt.compareSync(password, results[0].lozinka);
+            
+            if (isPasswordValid) {
+                // Kreiraj JWT token
+                const token = jwt.sign(
+                    { 
+                        userId: results[0].id, 
+                        email: results[0].email,
+                        username: results[0].ime 
+                    },
+                    JWT_SECRET,
+                    { expiresIn: '24h' }
+                );
+
+                res.status(200).json({ 
+                    success: true, 
+                    message: "Login successful!", 
+                    token: token,
+                    user: {
+                        id: results[0].id,
+                        username: results[0].ime,
+                        email: results[0].email
+                    }
+                });
+            } else {
+                res.status(401).json({ 
+                    success: false, 
+                    message: "Invalid username or password." 
+                });
+            }
         } else {
             res.status(401).json({ 
                 success: false, 
@@ -98,10 +134,55 @@ const loginUser = (req, res) => {
     });
 };
 
+// Middleware za verifikaciju JWT tokena
+const verifyToken = (req, res, next) => {
+    const token = req.headers['authorization'];
+
+    if (!token) {
+        return res.status(403).json({ 
+            success: false, 
+            message: "Token nije pronađen." 
+        });
+    }
+
+    // Ukloni "Bearer " iz tokena ako postoji
+    const tokenValue = token.startsWith('Bearer ') ? token.slice(7) : token;
+
+    try {
+        const decoded = jwt.verify(tokenValue, JWT_SECRET);
+        req.user = decoded;
+        next();
+    } catch (err) {
+        return res.status(401).json({ 
+            success: false, 
+            message: "Nevažeći ili istekao token." 
+        });
+    }
+};
+
 app.use(express.json());
+
+// CORS konfiguracija
+const corsOptions = {
+    origin: ['http://localhost:3000', 'http://localhost:8080', '*'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+app.use(cors(corsOptions));
 
 app.post('/register', registerUser);
 app.post('/login', loginUser);
+
+// Primer zaštićene rute - samo autentifikovani korisnici
+app.get('/protected', verifyToken, (req, res) => {
+    res.status(200).json({ 
+        success: true, 
+        message: "Pristup dozvoljen!",
+        user: req.user 
+    });
+});
 
 const PORT = 3000;
 app.listen(PORT, '0.0.0.0', () => {
